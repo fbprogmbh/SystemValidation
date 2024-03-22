@@ -9,9 +9,6 @@ function Get-Event{
     param(
         [System.Diagnostics.Eventing.Reader.EventLogRecord] $event
     )
-    if ($event.Id -eq 1002 -or $event.Id -eq 300 -or $event.Id -eq 2001 -or $event.Id -eq 4252) {
-        return;
-    }
     htmlElement 'tr' @{} {
         htmlElement 'td' @{} { $event.TimeCreated }
         htmlElement 'td' @{} { $event.Id }
@@ -38,11 +35,19 @@ function Get-LogsByLogName {
     $args.Add("EndTime", (Get-Date))
     $args.Add("LogName", $logName)
     
-    $eventPS = Get-WinEvent -FilterHashtable $args
+    #Filtering out EventIDs by EventLog source instead of global filtering
+    $eventPS
+    switch ($logName) {
+        "Microsoft-Windows-Windows Defender/Operational" { $eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 2001 -and $_.Id -ne 1002}}
+        "Windows PowerShell" {$eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 300}}
+        "Microsoft-Windows-Dsc/Operational" {$eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 4252}}
+        Default {$eventPS = Get-WinEvent -FilterHashtable $args}
+    }
+
     $warningEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Warning" }
     $errorEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Error" }
     $criticalEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Critical" }
-    if ($warningEvents.Length + $errorEvents.Length + $criticalEvents.Length -eq 0 ) {
+   if (($warningEvents.Length + $errorEvents.Length + $criticalEvents.Length) -eq 0 ) {
         return;
     }
     foreach ($event in $warningEvents) {
@@ -66,31 +71,30 @@ function Get-LogCountByName {
     $args.Add("StartTime", ((Get-Date).AddDays((-30))))
     $args.Add("EndTime", (Get-Date))
     $args.Add("LogName", $logName)
+
+    #Filtering out EventIDs by EventLog source instead of global filtering
+    $eventPS
+    switch ($logName) {
+        "Microsoft-Windows-Windows Defender/Operational" { $eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 2001 -and $_.Id -ne 1002}}
+        "Windows PowerShell" {$eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 300}}
+        "Microsoft-Windows-Dsc/Operational" {$eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 4252}}
+        Default {$eventPS = Get-WinEvent -FilterHashtable $args}
+    }
     
-    $eventPS = Get-WinEvent -FilterHashtable $args
     $warningEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Warning" }
     $errorEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Error" }
     $criticalEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Critical" }
     $sum = 0
     foreach ($event in $warningEvents) {
-        if ($event.Id -eq 1002 -or $event.Id -eq 300 -or $event.Id -eq 2001 -or $event.Id -eq 4252) {
-            continue;
-        }
         $sum += 1
     }
     foreach ($event in $errorEvents) {
-        if ($event.Id -eq 1002 -or $event.Id -eq 300 -or $event.Id -eq 2001 -or $event.Id -eq 4252) {
-            continue;
-        }
         $sum += 1
     }
     foreach ($event in $criticalEvents) {
-        if ($event.Id -eq 1002 -or $event.Id -eq 300 -or $event.Id -eq 2001 -or $event.Id -eq 4252) {
-            continue;
-        }
         $sum += 1
     }
-    if ($warningEvents.Length + $errorEvents.Length + $criticalEvents.Length -eq 0) {
+    if (($warningEvents.Length + $errorEvents.Length + $criticalEvents.Length) -eq 0) {
         return "No Logs found.";
     }
     return $sum
@@ -896,11 +900,11 @@ function Create-HTMLBody {
             }
         }
         htmlElement 'p' @{} { "*Excluded the following EventIDs as they are not relevant:" }
-        htmlElement 'ul' @{} { 
-            htmlElement 'li' @{} {"300"}    
-            htmlElement 'li' @{} {"1002"}    
-            htmlElement 'li' @{} {"2001"}    
-            htmlElement 'li' @{} {"4252"}    
+        htmlElement 'ul' @{} {    
+            htmlElement 'li' @{} {"DSC:             4252"}  
+            htmlElement 'li' @{} {"PowerShell:       300"}    
+            htmlElement 'li' @{} {"WindowsDefender: 1002"}    
+            htmlElement 'li' @{} {"WindowsDefender: 2001"}   
         }
     }
 
