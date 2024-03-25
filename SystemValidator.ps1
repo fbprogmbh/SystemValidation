@@ -669,7 +669,7 @@ function Create-HTMLBody {
             htmlElement 'tbody' @{} {
                 $hostname = $(hostname)
                 $testWSMan = Test-WSMan -computername $hostname -ErrorVariable "wmitest" -Authentication Negotiate
-                $IPv4Filter = Get-ItemProperty -ErrorAction SilentlyContinue -Path "Registry::Software\Policies\Microsoft\Windows\WinRM\Service" -Name "IPv6Filter" | Select-Object -ExpandProperty "IPv4Filter"
+                $IPv4Filter = Get-ItemProperty -ErrorAction SilentlyContinue -Path "Registry::Software\Policies\Microsoft\Windows\WinRM\Service" -Name "IPv4Filter" | Select-Object -ExpandProperty "IPv4Filter"
                 $IPv6Filter = Get-ItemProperty -ErrorAction SilentlyContinue -Path "Registry::Software\Policies\Microsoft\Windows\WinRM\Service" -Name "IPv6Filter" | Select-Object -ExpandProperty "IPv6Filter"
                 ConfigurationCheck "wmid" $($testWSMan.wsmid) "info" ""
                 ConfigurationCheck "ProtocolVersion" $($testWSMan.ProtocolVersion) "info" ""
