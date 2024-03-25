@@ -616,7 +616,7 @@ function Create-HTMLBody {
                     Write-Host "LCM is in status '$($lcmConfigs.LCMStateDetail)', waiting..."
                     $lcmConfigs = Get-DscLocalConfigurationManager
                 }
-                $testDSC = Test-DscConfiguration
+                Test-DscConfiguration
                 $dscStatus = Get-DscConfigurationStatus
             }
             htmlElement 'tbody' @{} {
