@@ -673,7 +673,7 @@ function Create-HTMLBody {
             $dscStatus = $null
             $lcmConfigs = Get-DscLocalConfigurationManager
             if($lcmConfigs.RefreshMode -ne "Disabled"){
-                while($lcmConfigs.LCMStateDetail -ne ""){
+                while($lcmConfigs.LCMState -ne "Idle"){
                     Start-Sleep -Seconds 5
                     Write-Host "LCM is in status '$($lcmConfigs.LCMStateDetail)', waiting..."
                     $lcmConfigs = Get-DscLocalConfigurationManager
