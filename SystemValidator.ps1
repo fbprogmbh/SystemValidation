@@ -693,8 +693,8 @@ function Create-HTMLBody {
         }
 
         
-        Write-Host "Fetching User Right Assignements"
-        htmlElement 'h2' @{} { "User Right Assignements" }
+        Write-Host "Fetching User Rights Assignments"
+        htmlElement 'h2' @{} { "User Rights Assignments" }
         htmlElement 'table' @{} {
             htmlElement 'thead' @{} {
                 htmlElement 'tr' @{} {
