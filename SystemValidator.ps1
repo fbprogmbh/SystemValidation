@@ -669,9 +669,11 @@ function Create-HTMLBody {
             htmlElement 'tbody' @{} {
                 $hostname = $(hostname)
                 $testWSMan = Test-WSMan -computername $hostname -ErrorVariable "wmitest" -Authentication Negotiate
-                $IPv4Filter = Get-ItemProperty -ErrorAction SilentlyContinue -Path "Registry::Software\Policies\Microsoft\Windows\WinRM\Service" -Name "IPv4Filter" | Select-Object -ExpandProperty "IPv4Filter"
-                $IPv6Filter = Get-ItemProperty -ErrorAction SilentlyContinue -Path "Registry::Software\Policies\Microsoft\Windows\WinRM\Service" -Name "IPv6Filter" | Select-Object -ExpandProperty "IPv6Filter"
-                ConfigurationCheck "wmid" $($testWSMan.wsmid) "info" ""
+                # Run the WinRM command for ipv4/ipv6 filter
+                $winrmServiceConfig = winrm get winrm/config/service
+                # Extract the IPv4Filter and IPv6Filter values using regex
+                $IPv4Filter = ($winrmServiceConfig | Select-String -Pattern "IPv4Filter\s*=\s*(.+)").Matches.Groups[1].Value.Trim()
+                $IPv6Filter = ($winrmServiceConfig | Select-String -Pattern "IPv6Filter\s*=\s*(.+)").Matches.Groups[1].Value.Trim()
                 ConfigurationCheck "ProtocolVersion" $($testWSMan.ProtocolVersion) "info" ""
                 ConfigurationCheck "ProductVendor" $($testWSMan.ProductVendor) "info" ""
                 ConfigurationCheck "ProductVersion" $($testWSMan.ProductVersion) "info" ""
