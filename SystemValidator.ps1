@@ -1,5 +1,8 @@
 #SystemValidator Version
 $version = "1.0.1"
+#Path for resulting report
+$outPath = "C:\Temp\SystemValidatorOutput.html"
+
 function isAdmin {
     return ([Security.Principal.WindowsIdentity]::GetCurrent().Groups -contains 'S-1-5-32-544')
 }
@@ -953,7 +956,7 @@ function Create-HTMLBody {
     Write-Host "Done"
     return $body
 }
-$Path = "C:\Temp\SystemValidatorOutput.html"
+
 if (!(isAdmin)) {
     [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
     [System.Windows.Forms.MessageBox]::Show("Please run as administrator", "Insufficient permisions", 0, [System.Windows.Forms.MessageBoxIcon]::Error)
@@ -961,10 +964,10 @@ if (!(isAdmin)) {
 else {
     Write-Host "Initializing..."
     #If Path exists to a folder exists
-    if ($Path -match ".html") {
-        $name = Split-Path -Path $Path -Leaf
-        $Path = Split-Path -Path $Path -Parent
+    if ($outPath -match ".html") {
+        $name = Split-Path -Path $outPath -Leaf
+        $outPath = Split-Path -Path $outPath -Parent
         $html = Create-HTMLDocument
-        New-Item -Path $Path -Name $name -ItemType File -Value $html -Force 
+        New-Item -Path $outPath -Name $name -ItemType File -Value $html -Force 
     }
 }
