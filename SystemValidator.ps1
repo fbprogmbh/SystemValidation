@@ -964,6 +964,7 @@ function Create-HTMLBody {
     return $body
 }
 $Path = Join-Path -Path (Get-Location) -ChildPath "SystemValidatorOutput.html"
+>>>>>>>>> Temporary merge branch 2
 if (!(isAdmin)) {
     [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
     [System.Windows.Forms.MessageBox]::Show("Please run as administrator", "Insufficient permisions", 0, [System.Windows.Forms.MessageBoxIcon]::Error)
