@@ -6,10 +6,35 @@ param(
 
 
 #SystemValidator Version
-$version = "1.0"
+$version = "1.0.1"
+#Path for resulting report
+$outPath = "C:\Temp\SystemValidatorOutput.html"
+
 function isAdmin {
     return ([Security.Principal.WindowsIdentity]::GetCurrent().Groups -contains 'S-1-5-32-544')
 }
+
+
+function Get-Event{
+    param(
+        [System.Diagnostics.Eventing.Reader.EventLogRecord] $event
+    )
+    htmlElement 'tr' @{} {
+        htmlElement 'td' @{} { $event.TimeCreated }
+        htmlElement 'td' @{} { $event.Id }
+        htmlElement 'td' @{} { $event.LevelDisplayName }
+        if($event.LevelDisplayName -eq "Warning"){
+            htmlElement 'td' @{style = "background-color: yellow;" } { $event.Message }
+        }
+        if($event.LevelDisplayName -eq "Error"){
+            htmlElement 'td' @{style = "background-color: orange;" } { $event.Message }
+        }
+        if($event.LevelDisplayName -eq "Critical"){
+            htmlElement 'td' @{style = "background-color: red;" } { $event.Message }
+        }
+    }
+}
+
 
 function Get-LogsByLogName {
     param (
@@ -20,34 +45,53 @@ function Get-LogsByLogName {
     $args.Add("EndTime", (Get-Date))
     $args.Add("LogName", $logName)
     
-    $eventPS = Get-WinEvent -FilterHashtable $args
+    #Filtering out EventIDs by EventLog source instead of global filtering
+    $eventPS
+    switch ($logName) {
+        "Microsoft-Windows-Windows Defender/Operational" { $eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 2001 -and $_.Id -ne 1002}}
+        "Windows PowerShell" {$eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 300}}
+        "Microsoft-Windows-Dsc/Operational" {$eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 4252}}
+        Default {$eventPS = Get-WinEvent -FilterHashtable $args}
+    }
+
     $warningEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Warning" }
     $errorEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Error" }
-    if ($warningEvents.Length + $errorEvents.Length -eq 0) {
+    $criticalEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Critical" }
+   if (($warningEvents.Length + $errorEvents.Length + $criticalEvents.Length) -eq 0 ) {
         return;
     }
     foreach ($event in $warningEvents) {
-        if ($event.Id -eq 1002 -or $event.Id -eq 300 -or $event.Id -eq 2001 -or $event.Id -eq 4252) {
-            continue;
-        }
-        htmlElement 'tr' @{} {
-            htmlElement 'td' @{} { $event.TimeCreated }
-            htmlElement 'td' @{} { $event.Id }
-            htmlElement 'td' @{} { $event.LevelDisplayName }
-            htmlElement 'td' @{style = "background-color: orange;" } { $event.Message }
-        }
+        Get-Event $event
     }
     foreach ($event in $errorEvents) {
-        if ($event.Id -eq 1002 -or $event.Id -eq 300 -or $event.Id -eq 2001 -or $event.Id -eq 4252) {
-            continue;
-        }
-        htmlElement 'tr' @{} {
-            htmlElement 'td' @{} { $event.TimeCreated }
-            htmlElement 'td' @{} { $event.Id }
-            htmlElement 'td' @{} { $event.LevelDisplayName }
-            htmlElement 'td' @{style = "background-color: red;" } { $event.Message }
-        }
+        Get-Event $event
     }
+    foreach ($event in $criticalEvents) {
+        Get-Event $event
+    }
+}
+
+function Get-BatteryStatus{
+    [CmdletBinding()]
+    param (
+        [Parameter()]
+        [int]
+        $status
+    )
+    switch($status){
+        1 {return "The battery is discharging."}
+        2 {return "The system has access to AC so no battery is being discharged."}
+        3 {return "Fully Charged"}
+        4 {return "Low"}
+        5 {return "Critical"}
+        6 {return "Charging"}
+        7 {return "Charging and High"}
+        8 {return "Charging and Low"}
+        9 {return "Charging and Critical"}
+        10 {return "Undefined"}
+        11 {return "Partially Charged"}
+    }
+    return "Undefined"
 }
 
 function Get-LogCountByName {
@@ -58,24 +102,30 @@ function Get-LogCountByName {
     $args.Add("StartTime", ((Get-Date).AddDays((-30))))
     $args.Add("EndTime", (Get-Date))
     $args.Add("LogName", $logName)
+
+    #Filtering out EventIDs by EventLog source instead of global filtering
+    $eventPS
+    switch ($logName) {
+        "Microsoft-Windows-Windows Defender/Operational" { $eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 2001 -and $_.Id -ne 1002}}
+        "Windows PowerShell" {$eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 300}}
+        "Microsoft-Windows-Dsc/Operational" {$eventPS = Get-WinEvent -FilterHashtable $args | Where-Object {$_.Id -ne 4252}}
+        Default {$eventPS = Get-WinEvent -FilterHashtable $args}
+    }
     
-    $eventPS = Get-WinEvent -FilterHashtable $args
     $warningEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Warning" }
     $errorEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Error" }
+    $criticalEvents = $eventPS | Where-Object { $_.LevelDisplayName -eq "Critical" }
     $sum = 0
     foreach ($event in $warningEvents) {
-        if ($event.Id -eq 1002 -or $event.Id -eq 300 -or $event.Id -eq 2001 -or $event.Id -eq 4252) {
-            continue;
-        }
         $sum += 1
     }
     foreach ($event in $errorEvents) {
-        if ($event.Id -eq 1002 -or $event.Id -eq 300 -or $event.Id -eq 2001 -or $event.Id -eq 4252) {
-            continue;
-        }
         $sum += 1
     }
-    if ($warningEvents.Length + $errorEvents.Length -eq 0) {
+    foreach ($event in $criticalEvents) {
+        $sum += 1
+    }
+    if (($warningEvents.Length + $errorEvents.Length + $criticalEvents.Length) -eq 0) {
         return "No Logs found.";
     }
     return $sum
@@ -371,8 +421,8 @@ function ConfigurationCheck {
     }
     htmlElement 'tr' @{} {
         htmlElement 'td' @{} { $check }
-        htmlElement 'td' @{} { $currentConfig }
         htmlElement 'td' @{} { $targetConfig }
+        htmlElement 'td' @{} { $currentConfig }
         if ($result -eq "Compliant") {
             htmlElement 'td' @{class = "Compliant" } { $result }
         }
@@ -485,8 +535,8 @@ function Create-Table {
         htmlElement 'thead' @{} {
             htmlElement 'tr' @{} {
                 htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
-                htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                 htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                 htmlElement 'th' @{class = "informationRow" } { "Result" }
             }
         }
@@ -524,6 +574,7 @@ function Create-HTMLBody {
             "4"	{ "Backup Domain Controller" }
             "5"	{ "Primary Domain Controller" }
         }
+        Write-Host "Fetching system information"
         $disk = Get-CimInstance Win32_LogicalDisk | Where-Object -Property DeviceID -eq "C:"
         htmlElement 'table' @{} {
             htmlElement 'thead' @{} {
@@ -544,14 +595,30 @@ function Create-HTMLBody {
                 ConfigurationCheck "License Status" $($lcStatus) "" ""
             }
         }
+
+        htmlElement 'h2' @{} { "Battery information" }
+        htmlElement 'table' @{} {
+            htmlElement 'thead' @{} {
+                htmlElement 'tr' @{} {
+                    htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
+                }
+            }
+            $battery = Get-WmiObject -Class Win32_Battery
+            $battery_status = Get-BatteryStatus ($battery).BatteryStatus
+            htmlElement 'tbody' @{} {
+                ConfigurationCheck "Battery Status" $battery_status "" ""
+                ConfigurationCheck "Estimated Charge Remaining (%)" $battery.EstimatedChargeRemaining "" ""
+            }
+        }
         #PSVersionTable
+        Write-Host "Fetching PowerShell information"
         htmlElement 'h2' @{} { "PowerShell" }
         htmlElement 'table' @{} {
             htmlElement 'thead' @{} {
                 htmlElement 'tr' @{} {
                     htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
-                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Result" }
                 }
             }
@@ -575,13 +642,14 @@ function Create-HTMLBody {
         }
 
         #DSCLocalConfigurationManager
+        Write-Host "Fetching DSC LCM information"
         htmlElement 'h2' @{} { "DSCLocalConfigurationManager" }
         htmlElement 'table' @{} {
             htmlElement 'thead' @{} {
                 htmlElement 'tr' @{} {
                     htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
-                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Result" }
                 }
             }
@@ -599,13 +667,14 @@ function Create-HTMLBody {
             }
         }
 
+        Write-Host "Fetching DSC Configuration Status information"
         htmlElement 'h3' @{} { "DSC Status" }
         htmlElement 'table' @{} {
             htmlElement 'thead' @{} {
                 htmlElement 'tr' @{} {
                     htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
-                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Result" }
                 }
             }
@@ -614,8 +683,8 @@ function Create-HTMLBody {
             $dscStatus = $null
             $lcmConfigs = Get-DscLocalConfigurationManager
             if($lcmConfigs.RefreshMode -ne "Disabled"){
-                while($lcmConfigs.LCMStateDetail -ne ""){
-                    Start-Sleep -Seconds 20
+                while($lcmConfigs.LCMState -ne "Idle"){
+                    Start-Sleep -Seconds 5
                     Write-Host "LCM is in status '$($lcmConfigs.LCMStateDetail)', waiting..."
                     $lcmConfigs = Get-DscLocalConfigurationManager
                 }
@@ -634,13 +703,14 @@ function Create-HTMLBody {
         }
 
         
-        htmlElement 'h2' @{} { "User Right Assignements" }
+        Write-Host "Fetching User Rights Assignments"
+        htmlElement 'h2' @{} { "User Rights Assignments" }
         htmlElement 'table' @{} {
             htmlElement 'thead' @{} {
                 htmlElement 'tr' @{} {
                     htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
-                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Result" }
                 }
             }
@@ -656,34 +726,41 @@ function Create-HTMLBody {
 
 
         #WinRM
+        Write-Host "Fetching WinRM Configuration"
         htmlElement 'h2' @{} { "WinRM" }
         #WSMan Check
         htmlElement 'table' @{} {
             htmlElement 'thead' @{} {
                 htmlElement 'tr' @{} {
                     htmlElement 'th' @{class = "informationRow"; style = "padding-right: 161px;" } { "WSMan Check" }
-                    htmlElement 'th' @{class = "informationRow"; style = "padding-left: 77px;" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow"; style = "padding-left: 77px;" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Result" }
                 }
             }
             htmlElement 'tbody' @{} {
                 $hostname = $(hostname)
                 $testWSMan = Test-WSMan -computername $hostname -ErrorVariable "wmitest" -Authentication Negotiate
-                ConfigurationCheck "wmid" $($testWSMan.wsmid) "info" ""
+                # Run the WinRM command for ipv4/ipv6 filter
+                $winrmServiceConfig = winrm get winrm/config/service
+                # Extract the IPv4Filter and IPv6Filter values using regex
+                $IPv4Filter = ($winrmServiceConfig | Select-String -Pattern "IPv4Filter\s*=\s*(.+)").Matches.Groups[1].Value.Trim()
+                $IPv6Filter = ($winrmServiceConfig | Select-String -Pattern "IPv6Filter\s*=\s*(.+)").Matches.Groups[1].Value.Trim()
                 ConfigurationCheck "ProtocolVersion" $($testWSMan.ProtocolVersion) "info" ""
                 ConfigurationCheck "ProductVendor" $($testWSMan.ProductVendor) "info" ""
                 ConfigurationCheck "ProductVersion" $($testWSMan.ProductVersion) "info" ""
+                ConfigurationCheck "Allow remote server management through WinRM (IPv4)" $IPv4Filter "ne" $null
+                ConfigurationCheck "Allow remote server management through WinRM (IPv6)" $IPv6Filter "ne" $null
             }
         }
 
         #Service Check
         htmlElement 'table' @{} {
-            htmlElement 'thead' @{} {
+            htmlElement 'thead' @{} {ConfigurationCheck
                 htmlElement 'tr' @{} {
                     htmlElement 'th' @{class = "informationRow" } { "Service Check" }
-                    htmlElement 'th' @{class = "informationRow"; style = "padding-left: 48px;" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow"; style = "padding-left: 48px;" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Result" }
                 }
             }
@@ -703,8 +780,8 @@ function Create-HTMLBody {
             htmlElement 'thead' @{} {
                 htmlElement 'tr' @{} {
                     htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
-                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Result" }
                 }
             }         
@@ -717,14 +794,15 @@ function Create-HTMLBody {
         }
 
         #Public network profiles
+        Write-Host "Fetching Network Configuration"
         htmlElement 'h2' @{} { "Network Configuration" }
         htmlElement 'h3' @{} { "Network Profile Configuration" }
         htmlElement 'table' @{} {
             htmlElement 'thead' @{} {
                 htmlElement 'tr' @{} {
                     htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
-                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Result" }
                 }
             }
@@ -735,6 +813,7 @@ function Create-HTMLBody {
                 ConfigurationCheck "IPv6Connectivity" $info.IPv6Connectivity "info" ""
             }
         }
+        Write-Host "Fetching Proxy Configuration"
         htmlElement 'h3' @{} { "Proxy Configuration" }
         htmlElement 'table' @{} {
             htmlElement 'tbody' @{} {
@@ -744,13 +823,14 @@ function Create-HTMLBody {
 
 
         #PSSessionConfiguration
+        Write-Host "Fetching PSSessionConfiguration"
         htmlElement 'h2' @{} { "PSSessionConfiguration" }
         htmlElement 'table' @{} {
             htmlElement 'thead' @{} {
                 htmlElement 'tr' @{} {
                     htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
-                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Result" }
                 }
             }
@@ -771,13 +851,14 @@ function Create-HTMLBody {
 
 
         #Windows Defender Configuration
+        Write-Host "Fetching Microsoft Defender Configuration"
         htmlElement 'h2' @{} { "Windows Defender Configuration" }
         htmlElement 'table' @{} {
             htmlElement 'thead' @{} {
                 htmlElement 'tr' @{} {
                     htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
-                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
                     htmlElement 'th' @{class = "informationRow" } { "Result" }
                 }
             }
@@ -817,7 +898,7 @@ function Create-HTMLBody {
             }
         }
 
-        Write-Host "Fetching Event Logs - Windows Defender"
+        Write-Host "Fetching Event Logs - Microsoft Defender"
         htmlElement 'h3' @{} { "Event Logs - Windows Defender: $(Get-LogCountByName "Microsoft-Windows-Windows Defender/Operational")" }
         htmlElement 'label' @{for = "toggle" } { "Event Logs - Windows Defender" }
         htmlElement 'input' @{type = "checkbox"; id = "toggleWindowsDefender" } {}
@@ -871,11 +952,11 @@ function Create-HTMLBody {
             }
         }
         htmlElement 'p' @{} { "*Excluded the following EventIDs as they are not relevant:" }
-        htmlElement 'ul' @{} { 
-            htmlElement 'li' @{} {"300"}    
-            htmlElement 'li' @{} {"1002"}    
-            htmlElement 'li' @{} {"2001"}    
-            htmlElement 'li' @{} {"4252"}    
+        htmlElement 'ul' @{} {    
+            htmlElement 'li' @{} {"DSC:             4252"}  
+            htmlElement 'li' @{} {"PowerShell:       300"}    
+            htmlElement 'li' @{} {"WindowsDefender: 1002"}    
+            htmlElement 'li' @{} {"WindowsDefender: 2001"}   
         }
     }
 
