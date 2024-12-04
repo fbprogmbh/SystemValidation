@@ -970,17 +970,15 @@ if (!(isAdmin)) {
 }
 else {
     Write-Host "Fetching information, please wait..."
-    if(-not [string]::IsNullOrWhiteSpace($OutputPath) -and (Test-Path $OutputPath))
+    if(-not [string]::IsNullOrWhiteSpace($OutputPath) -and (Test-Path -PathType Container $OutputPath))
     {
         $Path = $OutputPath
     }
-    
-    if (-not (Test-Path $Path)) {
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
-    }
+
+
 
     if (-not ($Path -like "*.html")) {
-        $Path += "SystemValidatorOutput.html"
+        $Path = Join-Path -Path $Path -ChildPath "SystemValidatorOutput.html"
     }
     #If Path exists to a folder exists
     $name = Split-Path -Path $Path -Leaf
