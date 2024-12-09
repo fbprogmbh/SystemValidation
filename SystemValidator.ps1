@@ -843,6 +843,30 @@ function Create-HTMLBody {
         }
 
 
+        #Check System variables
+        Write-Host "Fetching System Variables"
+        htmlElement 'h2' @{} { "System variables" }
+        htmlElement 'table' @{} {
+            htmlElement 'thead' @{} {
+                htmlElement 'tr' @{} {
+                    htmlElement 'th' @{class = "informationRow" } { "Configuration Check" }
+                    htmlElement 'th' @{class = "informationRow" } { "Target Configuration" }
+                    htmlElement 'th' @{class = "informationRow" } { "Current Configuration" }
+                    htmlElement 'th' @{class = "informationRow" } { "Result" }
+                }
+            }
+            $pathVariable = [Environment]::GetEnvironmentVariable("PATH")
+            $psModuleVariable = [Environment]::GetEnvironmentVariable("PSModulePath")
+                        
+            htmlElement 'tbody' @{} {
+                ConfigurationCheck "System variable 'PATH' contains 'C:\Windows'" $(($pathVariable -split ";" -contains "C:\Windows")) "eq" "True"
+                ConfigurationCheck "System variable 'PATH' contains 'C:\Windows\system32'" $(($pathVariable -split ";" -contains "C:\Windows\system32")) "eq" "True"
+                ConfigurationCheck "System variable 'PSModulePath' contains 'C:\Program Files\WindowsPowerShell\Modules'" $(($psModuleVariable -split ";" -contains "C:\Program Files\WindowsPowerShell\Modules")) "eq" "True"
+            }
+        }
+
+        
+
         #Windows Defender Configuration
         Write-Host "Fetching Microsoft Defender Configuration"
         htmlElement 'h2' @{} { "Windows Defender Configuration" }
