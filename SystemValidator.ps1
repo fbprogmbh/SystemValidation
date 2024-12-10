@@ -963,7 +963,8 @@ function Create-HTMLBody {
     Write-Host "Done"
     return $body
 }
-$Path = Join-Path -Path (Get-Location) -ChildPath "SystemValidatorOutput.html"
+$date = Get-Date -format "yyyy-MM-dd_HH-mm" 
+$Path = Join-Path -Path (Get-Location) -ChildPath "SystemValidatorOutput_$($date).html"
 if (!(isAdmin)) {
     [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
     [System.Windows.Forms.MessageBox]::Show("Please run as administrator", "Insufficient permisions", 0, [System.Windows.Forms.MessageBoxIcon]::Error)
@@ -978,7 +979,7 @@ else {
 
 
     if (-not ($Path -like "*.html")) {
-        $Path = Join-Path -Path $Path -ChildPath "SystemValidatorOutput.html"
+        $Path = Join-Path -Path $Path -ChildPath "SystemValidatorOutput_$($date).html"
     }
     #If Path exists to a folder exists
     $name = Split-Path -Path $Path -Leaf
