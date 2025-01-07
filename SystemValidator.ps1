@@ -1,3 +1,10 @@
+[CmdletBinding()]
+param(
+    [Parameter()]
+    [string]$OutputPath
+)
+
+
 #SystemValidator Version
 $version = "1.0.1"
 #Path for resulting report
@@ -980,18 +987,27 @@ function Create-HTMLBody {
     Write-Host "Done"
     return $body
 }
-
+$date = Get-Date -format "yyyy-MM-dd_HH-mm" 
+$Path = Join-Path -Path (Get-Location) -ChildPath "SystemValidatorOutput_$($date).html"
 if (!(isAdmin)) {
     [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
     [System.Windows.Forms.MessageBox]::Show("Please run as administrator", "Insufficient permisions", 0, [System.Windows.Forms.MessageBoxIcon]::Error)
 }
 else {
-    Write-Host "Initializing..."
-    #If Path exists to a folder exists
-    if ($outPath -match ".html") {
-        $name = Split-Path -Path $outPath -Leaf
-        $outPath = Split-Path -Path $outPath -Parent
-        $html = Create-HTMLDocument
-        New-Item -Path $outPath -Name $name -ItemType File -Value $html -Force 
+    Write-Host "Fetching information, please wait..."
+    if(-not [string]::IsNullOrWhiteSpace($OutputPath) -and (Test-Path -PathType Container $OutputPath))
+    {
+        $Path = $OutputPath
     }
+
+
+
+    if (-not ($Path -like "*.html")) {
+        $Path = Join-Path -Path $Path -ChildPath "SystemValidatorOutput_$($date).html"
+    }
+    #If Path exists to a folder exists
+    $name = Split-Path -Path $Path -Leaf
+    $Path = Split-Path -Path $Path -Parent
+    $html = Create-HTMLDocument
+    New-Item -Path $Path -Name $name -ItemType File -Value $html -Force 
 }
